@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Delta Green Secure Node</title>
+
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
+<style>
+#lockScreen {
+  position: fixed;
+  inset: 0;
+  background: #111;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  font-family: 'VT323', monospace;
+}
+
+#lockContainer {
+  background: #9bbc0f;
+  padding: 30px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 0 30px black;
+  transition: background 0.2s;
+}
+
+#lockTitle {
+  font-size: 28px;
+  margin-bottom: 15px;
+  color: #0f380f;
+}
+
+#pinDots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #0f380f;
+  border-radius: 50%;
+}
+
+.dot.filled {
+  background: #0f380f;
+}
+
+#keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 60px);
+  gap: 10px;
+  justify-content: center;
+}
+
+#keypad button {
+  font-family: 'VT323', monospace;
+  font-size: 24px;
+  padding: 10px;
+  background: #0f380f;
+  color: #9bbc0f;
+  border: none;
+  cursor: pointer;
+}
+
+#keypad button:hover {
+  opacity: 0.8;
+}
+
+.lock-error {
+  background: #8b0000 !important;
+}
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  50% { transform: translateX(8px); }
+  75% { transform: translateX(-8px); }
+  100% { transform: translateX(0); }
+}
+
+.shake {
+  animation: shake 0.3s;
+}
+#screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 8px;
+
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.05) 0px,
+      rgba(0,0,0,0.05) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+
+  mix-blend-mode: multiply;
+}
+@keyframes lcdFlicker {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.985; }
+  100% { opacity: 1; }
+}
+
+#screen {
+  animation: lcdFlicker 3s infinite;
+}
+body {
+    background: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+#screen {
+    width: 480px;
+    height: 260px;
+    background: #9bbc0f;
+    color: #0f380f;
+    font-family: 'VT323', monospace;
+    display: flex;
+    border-radius: 8px;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.4);
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+#text-area {
+    flex: 1;
+    font-size: 28px;
+    line-height: 32px;
+    display: flex;
+    flex-direction: column;
+}
+
+#status-bar {
+    width: 70px;
+    border-left: 3px solid #0f380f;
+    padding-left: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.signal {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 40px;
+    margin-bottom: 15px;
+}
+
+.bar {
+    width: 6px;
+    background: #0f380f;
+}
+
+.bar:nth-child(1) { height: 6px; }
+.bar:nth-child(2) { height: 12px; }
+.bar:nth-child(3) { height: 18px; }
+.bar:nth-child(4) { height: 24px; }
+.bar:nth-child(5) { height: 30px; }
+
+.battery {
+    width: 36px;
+    height: 16px;
+    border: 3px solid #0f380f;
+    position: relative;
+}
+
+.battery::after {
+    content: "";
+    position: absolute;
+    right: -7px;
+    top: 4px;
+    width: 5px;
+    height: 6px;
+    background: #0f380f;
+}
+
+.battery-level {
+    height: 100%;
+    width: 70%;
+    background: #0f380f;
+}
+</style>
+</head>
+<body>
+<div id="lockScreen">
+
+  <div id="lockContainer">
+    <div id="lockTitle">ENTER PIN</div>
+
+    <div id="pinDots">
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+
+    <div id="keypad">
+      <button onclick="pressKey(1)">1</button>
+      <button onclick="pressKey(2)">2</button>
+      <button onclick="pressKey(3)">3</button>
+      <button onclick="pressKey(4)">4</button>
+      <button onclick="pressKey(5)">5</button>
+      <button onclick="pressKey(6)">6</button>
+      <button onclick="pressKey(7)">7</button>
+      <button onclick="pressKey(8)">8</button>
+      <button onclick="pressKey(9)">9</button>
+      <button onclick="clearPin()">C</button>
+      <button onclick="pressKey(0)">0</button>
+      <button onclick="submitPin()">OK</button>
+    </div>
+
+  </div>
+
+</div>
+<div id="screen">
+
+    <div id="text-area">
+
+        <div id="sender" style="font-size:20px; border-bottom:2px solid #0f380f; padding-bottom:6px; margin-bottom:10px;"></div>
+
+        <div id="text" style="flex:1;"></div>
+
+        <div id="nav" style="
+    padding-top:12px;
+    font-size:20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+">
+    <span id="prevBtn" style="cursor:pointer;">◀</span>
+    <span id="counter"></span>
+    <span id="nextBtn" style="cursor:pointer; margin-right:8px;">▶</span>
+</div>
+
+    </div>
+
+    <div id="status-bar">
+
+    <div>
+        <!-- Signal -->
+        <div class="signal">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
+
+        <!-- Battery -->
+        <div class="battery">
+            <div class="battery-level"></div>
+        </div>
+    </div>
+
+    <div class="small-text">DG-NODE</div>
+
+</div>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCfvqApQPD3_026RwzxvDLZsVbYa-EgB58",
+  authDomain: "handler-phone.firebaseapp.com",
+  databaseURL: "https://handler-phone-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "handler-phone",
+  storageBucket: "handler-phone.firebasestorage.app",
+  messagingSenderId: "297536326879",
+  appId: "1:297536326879:web:e77b88cd742c6372722d6a"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const messageRef = ref(db, "messages");
+
+let messagesArray = [];
+let currentIndex = 0;
+
+const textDiv = document.getElementById("text");
+const senderDiv = document.getElementById("sender");
+const counter = document.getElementById("counter");
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+
+function renderMessage() {
+
+  if (messagesArray.length === 0) {
+  senderDiv.innerHTML = "";
+  counter.innerHTML = "";
+
+  textDiv.innerHTML = `
+    <div style="
+      height:100%;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      font-size:160px;
+    ">
+      ▲
+    </div>
+  `;
+
+  prevBtn.style.opacity = 0.3;
+  nextBtn.style.opacity = 0.3;
+  prevBtn.style.pointerEvents = "none";
+  nextBtn.style.pointerEvents = "none";
+  return;
+}
+
+  const msg = messagesArray[currentIndex];
+
+  senderDiv.innerHTML = msg.sender || "UNKNOWN";
+  textDiv.innerHTML = msg.text;
+
+  counter.innerHTML = (currentIndex + 1) + " / " + messagesArray.length;
+
+  // Grey logic
+  if (currentIndex === 0) {
+    prevBtn.style.opacity = 0.3;
+    prevBtn.style.pointerEvents = "none";
+  } else {
+    prevBtn.style.opacity = 1;
+    prevBtn.style.pointerEvents = "auto";
+  }
+
+  if (currentIndex === messagesArray.length - 1) {
+    nextBtn.style.opacity = 0.3;
+    nextBtn.style.pointerEvents = "none";
+  } else {
+    nextBtn.style.opacity = 1;
+    nextBtn.style.pointerEvents = "auto";
+  }
+}
+onValue(messageRef, (snapshot) => {
+
+  const data = snapshot.val();
+
+  if (!data) {
+    messagesArray = [];
+    renderMessage();
+    return;
+  }
+
+  messagesArray = Object.values(data)
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  currentIndex = messagesArray.length - 1; // newest message
+  renderMessage();
+});
+
+// Navigation buttons
+prevBtn.onclick = () => {
+  if (currentIndex > 0) {
+    currentIndex--;
+    renderMessage();
+  }
+};
+
+nextBtn.onclick = () => {
+  if (currentIndex < messagesArray.length - 1) {
+    currentIndex++;
+    renderMessage();
+  }
+};
+
+// Keyboard support
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowLeft" && currentIndex > 0) {
+    currentIndex--;
+    renderMessage();
+  }
+
+  if (e.key === "ArrowRight" && currentIndex < messagesArray.length - 1) {
+    currentIndex++;
+    renderMessage();
+  }
+});
+// ----- PASSCODE LOGIC -----
+
+let enteredPin = "";
+const correctPin = "1234";
+
+window.pressKey = function(num) {
+  if (enteredPin.length >= 4) return;
+
+  enteredPin += num;
+  updateDots();
+};
+
+window.clearPin = function() {
+  enteredPin = "";
+  updateDots();
+};
+
+window.submitPin = function() {
+
+  if (enteredPin === correctPin) {
+    document.getElementById("lockScreen").style.display = "none";
+  } else {
+    const container = document.getElementById("lockContainer");
+    container.classList.add("lock-error", "shake");
+
+    setTimeout(() => {
+      container.classList.remove("lock-error", "shake");
+      enteredPin = "";
+      updateDots();
+    }, 400);
+  }
+};
+
+function updateDots() {
+  const dots = document.querySelectorAll(".dot");
+  dots.forEach((dot, index) => {
+    dot.classList.toggle("filled", index < enteredPin.length);
+  });
+}
+</script>
+
+</body>
+</html>
